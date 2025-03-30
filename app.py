@@ -1,5 +1,3 @@
-# 8_两种眼睛检测方法混合
-
 import cv2
 import numpy as np
 import time
@@ -34,7 +32,6 @@ def load_image(url):
                 break
     return img
 
-# 帮我写一个生成html文件的函数，输入是output_csv_path的csv文件，其中把这个csv文件的true_label列与predict_label列显示成混淆矩阵，并且显示这个csv文件的所有数据，以表格的形式显示，其中url与input_url列的值是图片的url，打开html直接显示图片，而不是显示url的值
 # 生成html文件的函数
 def generate_html_from_csv(csv_path, output_html_path):
     df = pd.read_csv(csv_path)
@@ -316,13 +313,7 @@ class EyeColorDetector:
         """计算颜色差异（欧几里得距离）"""
         return np.linalg.norm(color1 - color2)
 
-    # def color_difference(color1, color2):
-    #     """计算颜色差异（归一化欧几里得距离）"""
-    #     max_distance = np.sqrt(195075)  # 归一化因子
-    #     return np.linalg.norm(color1 - color2) / max_distance
-
-
-    def __call__(self, image1_path, image2_path): # , eye_color_diff_threshold
+    def __call__(self, image1_path, image2_path):
         image1 = cv2.imread(image1_path)
         image2 = cv2.imread(image2_path)
 
@@ -405,22 +396,16 @@ class EyeColorDetector:
         return eye_color_same_score, is_same
 
 
-
-
 if __name__ == "__main__":
-    # 加载 Haar 级联分类器
-    # eye_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_eye.xml')
-
     eye_frame_scale = 1#2
     # eye_color_diff_threshold = 30
     eye_color_same_score_threshold = 0.313
-
-    eye_color_detector = EyeColorDetector(eye_frame_scale=eye_frame_scale, eye_color_same_score_threshold=eye_color_same_score_threshold)
-    
     image_dir = "images"
     if not os.path.exists(image_dir):
         os.makedirs(image_dir, exist_ok=True)
 
+    eye_color_detector = EyeColorDetector(eye_frame_scale=eye_frame_scale, eye_color_same_score_threshold=eye_color_same_score_threshold)
+    
     eye_color_same_scores = []
     is_sames = []
 
@@ -497,11 +482,9 @@ if __name__ == "__main__":
         if index == 5:
             break
 
-
     print("eye_color_same_scores: ", eye_color_same_scores)
     print("is_sames: ", is_sames)
 
-    # new_csv_data.insert(0, df.columns.tolist() + ['is_same', 'eye_color_same_score', 'cost_time'])  # 添加标题行
     # 保存新的CSV文件
     new_csv_data.insert(0, df.columns.tolist() + ['predict_label', 'eye_color_same_score', 'cost_time'])  # 添加标题行
     output_csv_path = os.path.join("outputs", input_csv_path.replace('.csv', '_output.csv'))
