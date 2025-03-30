@@ -2,3 +2,4 @@ images
 outputs
 *.dat
 *.csv
+!test_eyes_color.csv
