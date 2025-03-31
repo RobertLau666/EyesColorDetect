@@ -13,6 +13,14 @@ import dlib
 import pandas as pd
 
 
+def url_prefix_map(url):
+    url = url.strip().replace('ali-us-sync-image.oss-us-east-1.aliyuncs.com', 'ali-bj-sync-image.oss-accelerate.aliyuncs.com')
+    return url
+
+def get_img_name_from_url(url):
+    img_name = url.replace('?x-oss-process=image/resize,w_1080/format,webp', '').split('/')[-1]
+    return img_name
+
 def load_image(url):
     img = None
     timeout_num = 0
@@ -43,7 +51,11 @@ def generate_html_from_csv(csv_path, output_html_path):
     
     # 生成混淆矩阵
     confusion_matrix = pd.crosstab(df['true_label'], df['predict_label'], rownames=['Actual'], colnames=['Predicted'], margins=True)
-    
+
+    # 添加 img_name1 和 img_name2 列
+    df['img_name1'] = df['url'].apply(lambda x: get_img_name_from_url(x))
+    df['img_name2'] = df['input_url'].apply(lambda x: get_img_name_from_url(x))
+
     # 将 `url` 和 `input_url` 列替换为 HTML img 标签
     df['url'] = df['url'].apply(lambda x: f'<img src="{x}" width="100">')
     df['input_url'] = df['input_url'].apply(lambda x: f'<img src="{x}" width="100">')
@@ -138,7 +150,6 @@ class EyeColorDetector:
         
         print("faces: ", faces)
         if len(faces) == 0:
-            # return []
             eyes = []
         else:
             # 获取68个面部关键点
@@ -445,9 +456,12 @@ if __name__ == "__main__":
     df = pd.read_csv(input_csv_path)
     new_csv_data = []
     for index, row in tqdm(df.iterrows(), total=df.shape[0]):
-        url, input_url = row[0].strip().replace('ali-us-sync-image.oss-us-east-1.aliyuncs.com', 'ali-bj-sync-image.oss-accelerate.aliyuncs.com'), row[1].strip().replace('ali-us-sync-image.oss-us-east-1.aliyuncs.com', 'ali-bj-sync-image.oss-accelerate.aliyuncs.com')  # 第一列对应url
-        img1_name, img2_name = url.replace('?x-oss-process=image/resize,w_1080/format,webp', '').split('/')[-1], input_url.replace('?x-oss-process=image/resize,w_1080/format,webp', '').split('/')[-1]
+        if index == 10:
+            break
+        url, input_url = url_prefix_map(row[0]), url_prefix_map(row[1])
+        img1_name, img2_name = get_img_name_from_url(url), get_img_name_from_url(input_url)
         img1_save_path, img2_save_path = os.path.join(image_dir, img1_name), os.path.join(image_dir, img2_name)
+        print("index: ", index, img1_save_path, img2_save_path)
 
         if not os.path.exists(img1_save_path):
             img1 = load_image(url)
@@ -479,9 +493,6 @@ if __name__ == "__main__":
 
         new_csv_data.append(row.tolist() + [predict_label, eye_color_same_score, cost_time])
 
-        if index == 5:
-            break
-
     print("eye_color_same_scores: ", eye_color_same_scores)
     print("is_sames: ", is_sames)
 
@@ -496,3 +507,5 @@ if __name__ == "__main__":
     output_html_path = output_csv_path.replace('.csv', '.html')
     generate_html_from_csv(output_csv_path, output_html_path)
     print(f"生成的HTML文件路径: {output_html_path}")
+
+# python app.py > outputs/test_eyes_color_output.log 2>&1 &
