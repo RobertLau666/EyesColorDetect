@@ -385,6 +385,10 @@ class EyeColorDetector:
         # else:
         #     print("未检测到眼睛")
         print("4")
+        if len(eye_colors1) == 0 or len(eye_colors2) == 0:
+            print("至少有一张图未检测到眼睛，无法计算，直接返回默认无效值")
+            return -1, False
+
         print("eyes1: ", eyes1)
         x, y, w, h = eyes1[0]
         eye1 = image1[y:y+h, x:x+w]
