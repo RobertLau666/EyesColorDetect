@@ -83,6 +83,28 @@ class EyeColorDetector:
         self.detector = dlib.get_frontal_face_detector()
         self.predictor = dlib.shape_predictor("shape_predictor_68_face_landmarks.dat")
 
+        # 下载预训练模型：https://github.com/nagadomi/lbpcascade_animeface
+        self.face_cascade_path = 'lbpcascade_animeface.xml'
+        self._download_cascade_files()
+        self.face_cascade = cv2.CascadeClassifier(self.face_cascade_path)
+
+        print("face_cascade loaded:", self.face_cascade is not None)
+        print("eye_cascade loaded:", self.eye_cascade is not None)
+        
+    def _download_cascade_files(self):
+        """自动下载缺失的分类器文件"""
+        # lbpcascade_animeface.xml
+        if not os.path.exists(self.face_cascade_path):
+            print("Downloading lbpcascade_animeface.xml...")
+            url = "https://raw.githubusercontent.com/nagadomi/lbpcascade_animeface/master/lbpcascade_animeface.xml"
+            try:
+                response = requests.get(url)
+                with open(self.face_cascade_path, 'wb') as f:
+                    f.write(response.content)
+                print("Download completed.")
+            except Exception as e:
+                raise RuntimeError(f"Failed to download {url}: {e}")
+
     def compute_histogram_similarity(self, hist1, hist2, method="bhattacharyya"):
         """计算两个直方图的相似度，返回值越接近1表示越相似"""
         hist1 = hist1 / hist1.sum()  # 归一化
@@ -125,24 +147,19 @@ class EyeColorDetector:
         similarity = self.compute_histogram_similarity(hist1, hist2, method)
         return similarity
 
-    # 1. 不太准 检测到了多个眼睛
-    def detect_eyes_haarcascade(self, image):
-        """检测眼睛区域"""
-        if image is None:
-            print("图片未正确加载")
-            return []
+    def detect_anime_face_eyes(self, image):
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        eyes = self.eye_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
-        eyes = [eye.astype(int).tolist() for eye in eyes]
-        # print('初始的 eyes: ', eyes)
-        return eyes
-    
-    # 计算眼睛区域边界框
-    def get_eye_bbox(self, points):
-        x = [p[0] for p in points]
-        y = [p[1] for p in points]
-        return [min(x), min(y), max(x)-min(x), max(y)-min(y)]
+        faces = self.face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5)
         
+        eyes = []
+        for (x, y, w, h) in faces:
+            roi = gray[y:y+h, x:x+w]
+            # 在检测到的人脸区域内用Haar检测眼睛
+            eye_rects = self.eye_cascade.detectMultiScale(roi, scaleFactor=1.1, minNeighbors=3)
+            for (ex, ey, ew, eh) in eye_rects:
+                eyes.append([x+ex, y+ey, ew, eh])
+        return eyes
+
     # 3. dlib
     def detect_eyes_dlib(self, image):
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
@@ -165,20 +182,41 @@ class EyeColorDetector:
             
             eyes = [self.get_eye_bbox(left_eye_points), self.get_eye_bbox(right_eye_points)]
         return eyes
-    
-    # 2. dlib + haarcascade
-    def detect_eyes(self, image):
-        """使用dlib关键点检测眼睛区域"""
+
+    # 1. 不太准 检测到了多个眼睛
+    def detect_eyes_haarcascade(self, image):
+        """检测眼睛区域"""
         if image is None:
             print("图片未正确加载")
             return []
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        eyes = self.eye_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
+        eyes = [eye.astype(int).tolist() for eye in eyes]
+        # print('初始的 eyes: ', eyes)
+        return eyes
+    
+    # 计算眼睛区域边界框
+    def get_eye_bbox(self, points):
+        x = [p[0] for p in points]
+        y = [p[1] for p in points]
+        return [min(x), min(y), max(x)-min(x), max(y)-min(y)]
+
+    def detect_eyes(self, image):
+        eyes = []
+        """使用dlib关键点检测眼睛区域"""
+        if image is None:
+            print("图片未正确加载")
+            return eyes
         
         # 先用 dlib检测眼睛
-        eyes = self.detect_eyes_dlib(image)
+        eyes = self.detect_anime_face_eyes(image)
         # 如果没有检测到眼睛，则使用 haarcascade 检测
         if eyes == []:
-            print("换个方法检测眼睛")
-            eyes = self.detect_eyes_haarcascade(image)
+            print("换dlib方法检测眼睛")
+            eyes = self.detect_eyes_dlib(image)
+            if eyes == []:
+                print("换haarcascade方法检测眼睛")
+                eyes = self.detect_eyes_haarcascade(image)
         print("eyes0: ", eyes)
         
         return eyes
