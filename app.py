@@ -40,7 +40,7 @@ def load_image(url):
                 break
     return img
 
-# 生成html文件的函数
+# 生成html文件的函数，包括混淆矩阵和表格内容
 def generate_html_from_csv(csv_path, output_html_path):
     df = pd.read_csv(csv_path)
     
